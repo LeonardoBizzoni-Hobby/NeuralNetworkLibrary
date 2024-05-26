@@ -1,18 +1,7 @@
 use nalgebra::DMatrix;
 use rand_distr::{Distribution, Normal};
 
-#[derive(Debug)]
-pub enum NeuralNetworkError {
-    InvalidNumberOfOutputNodes,
-    InvalidNumberOfInputNodes,
-
-    WeightError(WeightError),
-}
-
-#[derive(Debug)]
-pub enum WeightError {
-    InvalidVariance(f64),
-}
+use crate::nn_error::{NeuralNetworkError, WeightError};
 
 #[derive(Debug)]
 #[allow(dead_code)]
