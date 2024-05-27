@@ -9,49 +9,52 @@ pub struct NeuralNetwork {
     weights: Vec<DMatrix<f64>>,
 
     learning_rate: f64,
-
-    number_of_input_nodes: usize,
-    number_of_output_nodes: usize,
-
-    hlayer_node_count: Vec<usize>,
+    node_count_per_layer: Vec<usize>,
 }
 
 #[allow(dead_code)]
 impl NeuralNetwork {
     pub fn new(
-        number_of_input_nodes: usize,
-        number_of_output_nodes: usize,
         learning_rate: f64,
-        hlayer_node_count: Vec<usize>,
+        node_count_per_layer: Vec<usize>,
     ) -> Result<Self, NeuralNetworkError> {
-        if number_of_input_nodes == 0 {
+        if node_count_per_layer.len() <= 0 {
             return Err(NeuralNetworkError::InvalidNumberOfInputNodes);
-        } else if number_of_output_nodes == 0 {
+        } else if node_count_per_layer.len() <= 1 {
             return Err(NeuralNetworkError::InvalidNumberOfOutputNodes);
         }
 
         // Weights from input to first hidden (or output) layer
-        let mut weights: Vec<DMatrix<f64>> = vec![DMatrix::from_vec(
-            number_of_input_nodes,
-            1,
-            NeuralNetwork::generate_random_weights(number_of_input_nodes)?,
-        )];
+        let mut weights: Vec<DMatrix<f64>> = vec![];
 
-        // Weights from hidden to next hidden (or output)
-        for node_count in hlayer_node_count.iter() {
-            weights.push(DMatrix::from_vec(
-                *node_count,
-                1,
-                NeuralNetwork::generate_random_weights(*node_count)?,
+        for (i, node_count) in node_count_per_layer[..node_count_per_layer.len() - 1]
+            .iter()
+            .enumerate()
+        {
+            if *node_count <= 0 || node_count_per_layer[i + 1] <= 0 {
+                return Err(NeuralNetworkError::InvalidNumberOfNodes);
+            }
+
+            let random = match Normal::new(0.0, (*node_count as f64).powf(-0.5)) {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(NeuralNetworkError::WeightError(
+                        WeightError::InvalidVariance(*node_count as f64),
+                    ))
+                }
+            };
+
+            weights.push(DMatrix::from_fn(
+                node_count_per_layer[i + 1], // nrows = node_count in the next layer
+                *node_count,                 // ncols = node_count in the current layer
+                |_, _| -> f64 { random.sample(&mut rand::thread_rng()) },
             ));
         }
 
         Ok(Self {
             weights,
-            number_of_input_nodes,
-            number_of_output_nodes,
             learning_rate,
-            hlayer_node_count,
+            node_count_per_layer,
         })
     }
 
@@ -92,32 +95,32 @@ mod tests {
 
     #[test]
     fn nn_with_invalid_number_of_inputs() {
-        let nn = NeuralNetwork::new(0, 10, 42.0, vec![]);
+        let nn = NeuralNetwork::new(42.0, vec![0, 10]);
         assert!(nn.is_err())
     }
 
     #[test]
     fn nn_without_outputs() {
-        let nn = NeuralNetwork::new(1, 0, 42.0, vec![]);
+        let nn = NeuralNetwork::new(42.0, vec![1, 0]);
         assert!(nn.is_err())
     }
 
     #[test]
     fn nn_invalid_hidden_layer_node_count() {
-        let nn = NeuralNetwork::new(1, 1, 42.0, vec![0]);
+        let nn = NeuralNetwork::new(42.0, vec![1, 0, 1]);
         assert!(nn.is_err())
     }
 
     #[test]
     fn valid_nn_definition() {
         // NN with 1 input, no hidden and 1 output
-        let nn = NeuralNetwork::new(1, 1, 42.0, vec![]);
+        let nn = NeuralNetwork::new(42.0, vec![1, 1]);
         assert!(nn.is_ok())
     }
     #[test]
     fn valid_nn_with_hidden_layers_definition() {
         // NN with 1 input, 4 hidden layers each with 3 nodes, and 1 output
-        let nn = NeuralNetwork::new(1, 1, 42.0, vec![3, 3, 3, 3]);
+        let nn = NeuralNetwork::new(42.0, vec![1, 3, 3, 3, 3, 1]);
 
         assert!(nn.is_ok());
         assert_eq!(nn.unwrap().weights.len(), 5);
