@@ -1,3 +1,5 @@
+use std::slice::Iter;
+
 use nalgebra::DMatrix;
 use rand_distr::{Distribution, Normal};
 
@@ -62,30 +64,37 @@ impl NeuralNetwork {
     //     todo!()
     // }
 
-    // pub fn compute(&self, inputs: &[f64]) -> Result<f64, NNError> {
-    //     todo!()
-    // }
-
-    // fn activation(&self, sum: f64) -> f64 {
-    //     todo!()
-    // }
-
-    fn generate_random_weights(n: usize) -> Result<Vec<f64>, NeuralNetworkError> {
-        let random = match Normal::new(0.0, (n as f64).powf(-0.5)) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(NeuralNetworkError::WeightError(
-                    WeightError::InvalidVariance(n as f64),
-                ))
-            }
-        };
-        let mut weights: Vec<f64> = vec![0.0; n];
-
-        for weight in weights.iter_mut() {
-            *weight = random.sample(&mut rand::thread_rng());
+    pub fn query(&mut self, inputs: Vec<f64>) -> Result<Vec<f64>, NeuralNetworkError> {
+        if inputs.len() != self.node_count_per_layer[0] {
+            return Err(NeuralNetworkError::InsufficientInputData {
+                expected: self.node_count_per_layer[0],
+                found: inputs.len(),
+            });
         }
 
-        Ok(weights)
+        Ok(self.compute_query(
+            DMatrix::from_vec(self.node_count_per_layer[0], 1, inputs),
+            self.weights.iter(),
+        ))
+    }
+
+    fn compute_query(&self, input: DMatrix<f64>, mut weight_iter: Iter<DMatrix<f64>>) -> Vec<f64> {
+        match weight_iter.next() {
+            Some(weight) => {
+                let next_input: DMatrix<f64> = NeuralNetwork::activation_function(weight * input);
+                self.compute_query(next_input, weight_iter)
+            }
+            None => input.column(0).as_slice().into(),
+        }
+    }
+
+    fn activation_function(mut x: DMatrix<f64>) -> DMatrix<f64> {
+        // Sigmoid function applied to each element in the matrix (column vector)
+        for xi in x.iter_mut() {
+            *xi = 1.0 / (1.0 + std::f64::consts::E.powf(-*xi));
+        }
+
+        x
     }
 }
 
