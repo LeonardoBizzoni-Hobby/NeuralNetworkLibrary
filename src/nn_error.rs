@@ -6,6 +6,7 @@ pub enum NeuralNetworkError {
 
     WeightError(WeightError),
     InsufficientInputData { expected: usize, found: usize },
+    InsufficientTargetsData { expected: usize, found: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
